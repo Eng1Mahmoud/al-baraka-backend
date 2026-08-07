@@ -79,6 +79,7 @@ Put them in `.env` as `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`. 
 2. Build: `npm install && npm run build` · Start: `npm start`
 3. Health check path: `/health`
 4. Environment: every key from `.env.example`. `CORS_ORIGIN` must be the Vercel domain (comma-separate to add preview URLs).
-5. Pick the region closest to your customers, and create the Atlas cluster in that same region.
-6. **Use a paid instance.** On the free plan the service sleeps after 15 minutes idle, which delays order notifications until it wakes.
-7. After the first deploy, run `npm run seed:superadmin` once from the Render shell.
+5. Environment: **`TZ=Africa/Cairo`**. Render's containers run on UTC, and the order number and the dashboard's "today" both read the local clock — left on UTC they call an order taken at 01:00 in Cairo yesterday's.
+6. Pick the region closest to your customers, and create the Atlas cluster in that same region.
+7. **Use a paid instance.** On the free plan the service sleeps after 15 minutes idle, which delays order notifications until it wakes.
+8. After the first deploy, run `npm run seed:superadmin` once from the Render shell.

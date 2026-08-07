@@ -1,4 +1,4 @@
-import Order, { IOrderItem } from "../models/Order.js";
+import Order, { IOrder, IOrderItem } from "../models/Order.js";
 import Product from "../models/Product.js";
 import { OrderStatus, PaymentStatus } from "../types/index.js";
 import { ApiError } from "../utils/ApiError.js";
@@ -14,6 +14,12 @@ interface CreateOrderInput {
 
 /** The part of an order line that inventory cares about. */
 type StockLine = Pick<IOrderItem, "product" | "name" | "quantity">;
+
+/** The fields an order is created with — the rest of the schema has defaults. */
+type NewOrder = Pick<
+  IOrder,
+  "orderNumber" | "customer" | "items" | "deliveryArea" | "subtotal" | "deliveryFee" | "total"
+>;
 
 interface ListQuery {
   status?: OrderStatus;
@@ -88,8 +94,7 @@ class OrderService {
 
     let order;
     try {
-      order = await Order.create({
-        orderNumber: await this.generateOrderNumber(),
+      order = await this.insertWithOrderNumber({
         customer,
         items: orderItems,
         deliveryArea: area ? { area: area._id, name: area.name, price: area.price } : undefined,
@@ -227,16 +232,50 @@ class OrderService {
     );
   }
 
-  /** Human-readable order number: AB-YYMMDD-#### (sequence resets each day). */
+  /**
+   * Stamps the order with its number and inserts it.
+   *
+   * Two customers checking out in the same instant read the same sequence and ask for
+   * the same number. Only the unique index can settle that, so the loser is given the
+   * next number rather than the collision being prevented up front.
+   */
+  private async insertWithOrderNumber(fields: Omit<NewOrder, "orderNumber">) {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await Order.create({ ...fields, orderNumber: await this.generateOrderNumber() });
+      } catch (error) {
+        if ((error as { code?: number }).code !== 11000 || attempt === 5) throw error;
+      }
+    }
+  }
+
+  /**
+   * Human-readable order number: AB-YYMMDD-#### (sequence resets each day).
+   *
+   * The date is the shop's own, not UTC — an order taken at 01:00 in Cairo belongs to
+   * that day for the people reading the number. Every other day boundary here reads the
+   * clock the same way, so the server has to run on the shop's timezone: `TZ` is set to
+   * Africa/Cairo in the deployment environment.
+   *
+   * The sequence is read back from the numbers already issued under today's prefix
+   * rather than from a count of today's orders, so that it cannot disagree with the
+   * prefix about where the day starts. A count did exactly that, and every number it
+   * produced in the disputed hours was one the unique index had already seen.
+   */
   private async generateOrderNumber(): Promise<string> {
     const now = new Date();
-    const datePart = now.toISOString().slice(2, 10).replace(/-/g, "");
+    const datePart =
+      String(now.getFullYear() % 100).padStart(2, "0") +
+      String(now.getMonth() + 1).padStart(2, "0") +
+      String(now.getDate()).padStart(2, "0");
 
-    const startOfDay = new Date(now);
-    startOfDay.setHours(0, 0, 0, 0);
-    const todayCount = await Order.countDocuments({ createdAt: { $gte: startOfDay } });
+    const latest = await Order.findOne({ orderNumber: new RegExp(`^AB-${datePart}-`) })
+      .sort({ orderNumber: -1 })
+      .select("orderNumber")
+      .lean<{ orderNumber: string } | null>();
 
-    return `AB-${datePart}-${String(todayCount + 1).padStart(4, "0")}`;
+    const sequence = latest ? Number(latest.orderNumber.slice(-4)) + 1 : 1;
+    return `AB-${datePart}-${String(sequence).padStart(4, "0")}`;
   }
 }
 
