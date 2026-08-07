@@ -6,3 +6,6 @@ dist
 !.env.example
 *.log
 .DS_Store
+
+# One-off maintenance scripts stay local — they are run by hand, never by the server.
+src/scripts
