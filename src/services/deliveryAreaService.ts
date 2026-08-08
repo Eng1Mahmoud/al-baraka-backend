@@ -15,12 +15,6 @@ class DeliveryAreaService {
     return DeliveryArea.find(filter).sort({ order: 1, name: 1 });
   }
 
-  async getById(id: string) {
-    const area = await DeliveryArea.findById(id);
-    if (!area) throw ApiError.notFound("منطقة التوصيل غير موجودة");
-    return area;
-  }
-
   async create(data: DeliveryAreaInput) {
     return DeliveryArea.create(data);
   }

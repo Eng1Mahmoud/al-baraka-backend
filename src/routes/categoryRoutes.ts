@@ -1,7 +1,6 @@
 import { Router } from "express";
 import {
   getCategories,
-  getCategory,
   createCategory,
   updateCategory,
   deleteCategory,
@@ -12,7 +11,6 @@ const router = Router();
 
 // Public — the storefront needs the category list.
 router.get("/", getCategories);
-router.get("/:id", getCategory);
 
 // Dashboard
 router.post("/", protect, createCategory);

@@ -14,18 +14,6 @@ class CategoryService {
     return Category.find().sort({ order: 1, createdAt: 1 });
   }
 
-  async getById(id: string) {
-    const category = await Category.findById(id);
-    if (!category) throw ApiError.notFound("التصنيف غير موجود");
-    return category;
-  }
-
-  async getBySlug(slug: string) {
-    const category = await Category.findOne({ slug });
-    if (!category) throw ApiError.notFound("التصنيف غير موجود");
-    return category;
-  }
-
   async create(data: CategoryInput) {
     return Category.create({ ...data, slug: uniqueSlug(data.name) });
   }
