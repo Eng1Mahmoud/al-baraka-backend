@@ -52,9 +52,22 @@ class OrderService {
   }
 
   /** Public lookup for guests: order number must be paired with the phone used to order. */
-  async trackOrder(orderNumber: string, phone: string) {
-    const order = await Order.findOne({ orderNumber, "customer.phone": phone });
-    if (!order) throw ApiError.notFound("لم يتم العثور على طلب بهذه البيانات");
+  /**
+   * Public lookup by order number alone.
+   *
+   * Order numbers run AB-YYMMDD-0001, -0002, so anyone can walk them. The customer
+   * block is therefore never returned here: what comes back is what the person who
+   * placed the order already knows — its state, its lines and its total — and a
+   * guessed number reveals no name, phone or address.
+   *
+   * Uppercased because the number is read off a screen and typed back by hand.
+   */
+  async trackOrder(orderNumber: string) {
+    const order = await Order.findOne({ orderNumber: orderNumber.trim().toUpperCase() }).select(
+      "-customer"
+    );
+
+    if (!order) throw ApiError.notFound("لم يتم العثور على طلب بهذا الرقم");
     return order;
   }
 

@@ -24,12 +24,12 @@ export const createOrder = asyncHandler(async (req, res: Response) => {
   res.status(201).json(await orderService.create({ customer, items, deliveryAreaId }));
 });
 
-/** Public — guests look up their own order with number + phone. */
+/** Public — guests look up their own order by its number. */
 export const trackOrder = asyncHandler(async (req, res: Response) => {
-  const { orderNumber, phone } = req.query;
-  if (!orderNumber || !phone) throw ApiError.badRequest("رقم الطلب ورقم الهاتف مطلوبان");
+  const { orderNumber } = req.query;
+  if (!orderNumber) throw ApiError.badRequest("رقم الطلب مطلوب");
 
-  res.json(await orderService.trackOrder(String(orderNumber), String(phone)));
+  res.json(await orderService.trackOrder(String(orderNumber)));
 });
 
 /** Dashboard — polled every 5 seconds by TanStack Query. */
