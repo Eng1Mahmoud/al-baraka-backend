@@ -58,11 +58,6 @@ class OrderService {
     return order;
   }
 
-  /**
-   * Creates a guest order. Prices come from the database (never from the client) so a
-   * tampered cart cannot change what the customer is charged, and the stock each line
-   * needs is taken before the order exists — see `reserveStock`.
-   */
   async create({ customer, items, deliveryAreaId }: CreateOrderInput) {
     if (!items?.length) throw ApiError.badRequest("السلة فارغة");
 
@@ -171,12 +166,6 @@ class OrderService {
     };
   }
 
-  /**
-   * Two lines for the same product are one line.
-   *
-   * Sent separately they get checked against the full stock one at a time, so 3 + 3
-   * of a product with 4 in stock passes twice and oversells by two.
-   */
   private mergeLines(items: CreateOrderInput["items"]) {
     const totals = new Map<string, number>();
 
@@ -191,18 +180,6 @@ class OrderService {
     return [...totals].map(([productId, quantity]) => ({ productId, quantity }));
   }
 
-  /**
-   * Takes each line's quantity off the shelf, or takes nothing at all.
-   *
-   * The availability check and the decrement are a single `updateOne`: Mongo applies
-   * the filter and the `$inc` atomically, so two customers racing for the last kilo
-   * can't both be told they got it. Reading the stock first and decrementing after —
-   * which is what this used to do — leaves exactly that window open, and the shop
-   * finds out at packing time.
-   *
-   * Sequential rather than parallel so that a failure part-way through knows exactly
-   * what to put back. Carts are a handful of lines; the round trips are cheap.
-   */
   private async reserveStock(items: StockLine[]) {
     const taken: StockLine[] = [];
 
@@ -232,13 +209,6 @@ class OrderService {
     );
   }
 
-  /**
-   * Stamps the order with its number and inserts it.
-   *
-   * Two customers checking out in the same instant read the same sequence and ask for
-   * the same number. Only the unique index can settle that, so the loser is given the
-   * next number rather than the collision being prevented up front.
-   */
   private async insertWithOrderNumber(fields: Omit<NewOrder, "orderNumber">) {
     for (let attempt = 1; ; attempt++) {
       try {
@@ -249,19 +219,6 @@ class OrderService {
     }
   }
 
-  /**
-   * Human-readable order number: AB-YYMMDD-#### (sequence resets each day).
-   *
-   * The date is the shop's own, not UTC — an order taken at 01:00 in Cairo belongs to
-   * that day for the people reading the number. Every other day boundary here reads the
-   * clock the same way, so the server has to run on the shop's timezone: `TZ` is set to
-   * Africa/Cairo in the deployment environment.
-   *
-   * The sequence is read back from the numbers already issued under today's prefix
-   * rather than from a count of today's orders, so that it cannot disagree with the
-   * prefix about where the day starts. A count did exactly that, and every number it
-   * produced in the disputed hours was one the unique index had already seen.
-   */
   private async generateOrderNumber(): Promise<string> {
     const now = new Date();
     const datePart =

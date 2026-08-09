@@ -20,15 +20,6 @@ export const updateAdmin = asyncHandler<IdParam>(async (req, res: Response) => {
   res.json(await adminService.update(req.params.id, { name, email }));
 });
 
-export const resetAdminPassword = asyncHandler<IdParam>(async (req, res: Response) => {
-  const { newPassword } = req.body;
-  if (!newPassword || newPassword.length < 8) {
-    throw ApiError.badRequest("كلمة المرور يجب أن تكون 8 أحرف على الأقل");
-  }
-
-  await adminService.resetPassword(req.params.id, newPassword);
-  res.json({ message: "تم تغيير كلمة المرور" });
-});
 
 export const deleteAdmin = asyncHandler<IdParam>(async (req, res: Response) => {
   await adminService.remove(req.params.id);

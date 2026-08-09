@@ -35,12 +35,6 @@ class AdminService {
     return { id: user.id, name: user.name, email: user.email, role: user.role };
   }
 
-  async resetPassword(id: string, newPassword: string) {
-    const user = await this.getEditableAdmin(id);
-    user.password = await bcrypt.hash(newPassword, 10);
-    await user.save();
-  }
-
   async remove(id: string) {
     await this.getEditableAdmin(id);
     await User.findByIdAndDelete(id);

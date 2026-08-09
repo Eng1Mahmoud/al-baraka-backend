@@ -1,7 +1,5 @@
-// Must be the first import: ES modules are evaluated in import order, and the
-// config modules below read process.env while they are being evaluated.
-import "dotenv/config";
 
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
@@ -24,7 +22,7 @@ const app = express();
 
 await connectDB();
 
-const allowedOrigins = (process.env.CORS_ORIGIN || "http://localhost:3000")
+const allowedOrigins = (process.env.CORS_ORIGIN as string)
   .split(",")
   .map((origin) => origin.trim());
 
@@ -57,7 +55,7 @@ app.use("/api/push", pushRoutes);
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-const port = Number(process.env.PORT) || 4000;
+const port = Number(process.env.PORT) ;
 app.listen(port, () => {
   console.log(`Al-Baraka API running on http://localhost:${port}`);
 });

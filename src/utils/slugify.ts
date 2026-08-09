@@ -1,7 +1,3 @@
-/**
- * Builds a URL-safe slug. Arabic letters are kept as-is (they are valid in URLs once
- * encoded) so Arabic product names stay readable in the address bar.
- */
 export const slugify = (value: string): string =>
   value
     .trim()

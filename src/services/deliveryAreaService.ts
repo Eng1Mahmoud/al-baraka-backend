@@ -30,12 +30,6 @@ class DeliveryAreaService {
     if (!area) throw ApiError.notFound("منطقة التوصيل غير موجودة");
   }
 
-  /**
-   * The delivery fee for an order — always the price of the area the customer chose.
-   *
-   * Before the shop has added any area there is nothing to choose, so delivery is
-   * free rather than a dead end at checkout.
-   */
   async resolveFee(areaId?: string): Promise<{ fee: number; area: IDeliveryArea | null }> {
     const activeAreas = await DeliveryArea.countDocuments({ isActive: true });
     if (activeAreas === 0) return { fee: 0, area: null };

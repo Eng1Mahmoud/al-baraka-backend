@@ -38,16 +38,6 @@ class AuthService {
     return { id: user.id, name: user.name, email: user.email, role: user.role };
   }
 
-  async changeOwnPassword(userId: string, currentPassword: string, newPassword: string) {
-    const user = await User.findById(userId).select("+password");
-    if (!user) throw ApiError.notFound("المستخدم غير موجود");
-
-    const matches = await bcrypt.compare(currentPassword, user.password);
-    if (!matches) throw ApiError.badRequest("كلمة المرور الحالية غير صحيحة");
-
-    user.password = await bcrypt.hash(newPassword, 10);
-    await user.save();
-  }
 }
 
 export const authService = new AuthService();

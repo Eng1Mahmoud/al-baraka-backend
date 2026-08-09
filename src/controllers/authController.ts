@@ -32,11 +32,3 @@ export const me = asyncHandler(async (req: AuthRequest, res: Response) => {
   res.json(await authService.getProfile(req.user!.id));
 });
 
-export const changePassword = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const { currentPassword, newPassword } = req.body;
-  if (!currentPassword || !newPassword) throw ApiError.badRequest("كل الحقول مطلوبة");
-  if (newPassword.length < 8) throw ApiError.badRequest("كلمة المرور يجب أن تكون 8 أحرف على الأقل");
-
-  await authService.changeOwnPassword(req.user!.id, currentPassword, newPassword);
-  res.json({ message: "تم تغيير كلمة المرور" });
-});

@@ -26,10 +26,6 @@ class PushService {
     await PushSubscription.deleteOne({ endpoint });
   }
 
-  /**
-   * Sends a notification to every subscribed admin. Subscriptions the browser has
-   * expired (404/410) are pruned so the collection does not accumulate dead endpoints.
-   */
   async broadcast(payload: PushPayload) {
     if (!isWebPushConfigured()) return;
 

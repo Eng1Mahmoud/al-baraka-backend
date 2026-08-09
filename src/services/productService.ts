@@ -78,15 +78,6 @@ class ProductService {
     return { items, total, page, pages, hasMore: page < pages };
   }
 
-  /**
-   * One section per category for the home page, each with its newest products.
-   * Done in a single round trip so the home page isn't N requests deep.
-   *
-   * Unavailable products are included — the storefront labels them rather than
-   * hiding them, so a customer who came looking for something learns it's off today
-   * instead of finding a shop that never sold it. They sort last within the row,
-   * though: a rail is only eight cards wide and the ones you can buy come first.
-   */
   async homeSections(perCategory = 8) {
     const categories = await Category.find().sort({ order: 1, createdAt: 1 });
 

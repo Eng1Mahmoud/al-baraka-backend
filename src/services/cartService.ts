@@ -6,11 +6,6 @@ interface CartLine {
   quantity: number;
 }
 
-/**
- * The cart lives in the customer's browser, so every total shown on the cart page
- * is re-derived here from the database. Prices, availability and stock can all
- * change while a cart sits open — this is what catches that before checkout.
- */
 class CartService {
   async validate(lines: CartLine[], deliveryAreaId?: string) {
     const products = await Product.find({ _id: { $in: lines.map((line) => line.productId) } }).populate(
@@ -80,16 +75,6 @@ class CartService {
       total: subtotal + deliveryFee,
       requiresArea,
       selectedArea,
-      /**
-       * Whether the cart may proceed to checkout. Every line has to be orderable,
-       * not just one: an order is created all-or-nothing, so letting a cart with a
-       * sold-out line through only walks the customer to a rejection at the end of
-       * the checkout form. The cart page already flags which line to fix.
-       *
-       * The area is deliberately not part of it — it's chosen on the checkout page
-       * itself, and enforced there by the form and again by the server when the
-       * order is created.
-       */
       canCheckout: orderable.length > 0 && orderable.length === items.length,
     };
   }
