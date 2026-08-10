@@ -2,6 +2,7 @@ import { FilterQuery, SortOrder } from "mongoose";
 import Product, { IProduct } from "../models/Product.js";
 import Category from "../models/Category.js";
 import { ApiError } from "../utils/ApiError.js";
+import { escapeRegex } from "../utils/escapeRegex.js";
 import { uniqueSlug } from "../utils/slugify.js";
 
 interface ProductInput {
@@ -55,7 +56,7 @@ class ProductService {
       filter.category = categoryDoc._id;
     }
 
-    if (search) filter.name = { $regex: search, $options: "i" };
+    if (search) filter.name = { $regex: escapeRegex(search.trim()), $options: "i" };
     if (availableOnly) filter.isAvailable = true;
 
     if (minPrice != null || maxPrice != null) {

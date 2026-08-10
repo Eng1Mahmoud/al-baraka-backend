@@ -34,11 +34,12 @@ export const trackOrder = asyncHandler(async (req, res: Response) => {
 
 /** Dashboard — polled every 5 seconds by TanStack Query. */
 export const getOrders = asyncHandler(async (req, res: Response) => {
-  const { status, page, limit, since } = req.query;
+  const { status, search, page, limit, since } = req.query;
 
   res.json(
     await orderService.list({
       status: status as OrderStatus | undefined,
+      search: search as string | undefined,
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
       since: since as string | undefined,
@@ -66,4 +67,12 @@ export const updatePaymentStatus = asyncHandler<IdParam>(async (req, res: Respon
 
 export const getStats = asyncHandler(async (_req, res: Response) => {
   res.json(await orderService.stats());
+});
+
+export const getAnalytics = asyncHandler(async (req, res: Response) => {
+  const days = req.query.days ? Number(req.query.days) : undefined;
+
+  // Clamped: the window is a chart axis, and an unbounded one is an open invitation
+  // to aggregate the whole collection from a query string.
+  res.json(await orderService.analytics(days ? Math.min(Math.max(days, 7), 90) : undefined));
 });

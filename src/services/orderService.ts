@@ -2,6 +2,7 @@ import Order, { IOrder, IOrderItem } from "../models/Order.js";
 import Product from "../models/Product.js";
 import { OrderStatus, PaymentStatus } from "../types/index.js";
 import { ApiError } from "../utils/ApiError.js";
+import { escapeRegex } from "../utils/escapeRegex.js";
 import { deliveryAreaService } from "./deliveryAreaService.js";
 import { pushService } from "./pushService.js";
 
@@ -23,6 +24,8 @@ type NewOrder = Pick<
 
 interface ListQuery {
   status?: OrderStatus;
+  /** Order number, customer name, or phone — whichever the caller has to hand. */
+  search?: string;
   page?: number;
   limit?: number;
   /** Returns only orders created after this ISO timestamp — used by the dashboard poller. */
@@ -30,10 +33,22 @@ interface ListQuery {
 }
 
 class OrderService {
-  async list({ status, page = 1, limit = 20, since }: ListQuery) {
+  async list({ status, search, page = 1, limit = 20, since }: ListQuery) {
     const filter: Record<string, unknown> = {};
     if (status) filter.status = status;
     if (since) filter.createdAt = { $gt: new Date(since) };
+
+    // Three fields, because a shop looking an order up has one of three things: the
+    // number off the customer's screen, the name they gave, or the phone they rang from.
+    const term = search?.trim();
+    if (term) {
+      const pattern = { $regex: escapeRegex(term), $options: "i" };
+      filter.$or = [
+        { orderNumber: pattern },
+        { "customer.name": pattern },
+        { "customer.phone": pattern },
+      ];
+    }
 
     const skip = (page - 1) * limit;
     const [items, total, pendingCount] = await Promise.all([
@@ -42,7 +57,10 @@ class OrderService {
       Order.countDocuments({ status: "pending" }),
     ]);
 
-    return { items, total, page, pages: Math.ceil(total / limit) || 1, pendingCount };
+    // `hasMore` rather than leaving the client to compare page against pages, and
+    // named as the product list names it so both feeds page the same way.
+    const pages = Math.ceil(total / limit) || 1;
+    return { items, total, page, pages, hasMore: page < pages, pendingCount };
   }
 
   async getById(id: string) {
@@ -177,6 +195,93 @@ class OrderService {
       deliveredOrders,
       totalRevenue: revenueAgg[0]?.total ?? 0,
     };
+  }
+
+  /**
+   * The dashboard charts, in one round trip.
+   *
+   * Cancelled orders are excluded from money and from the daily series — they were
+   * never sold — but kept in the status breakdown, which exists precisely to show how
+   * many there are.
+   */
+  async analytics(days = 14) {
+    const since = new Date();
+    since.setHours(0, 0, 0, 0);
+    since.setDate(since.getDate() - (days - 1));
+
+    const sold = { status: { $ne: "cancelled" } };
+
+    const [daily, byStatus, topProducts] = await Promise.all([
+      Order.aggregate<{ _id: string; orders: number; revenue: number }>([
+        { $match: { createdAt: { $gte: since }, ...sold } },
+        {
+          $group: {
+            // Grouped on the server's local day, matching how the shop reads a date.
+            _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+            orders: { $sum: 1 },
+            revenue: { $sum: "$total" },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]),
+
+      Order.aggregate<{ _id: OrderStatus; count: number }>([
+        { $group: { _id: "$status", count: { $sum: 1 } } },
+      ]),
+
+      Order.aggregate<{ _id: string; quantity: number; revenue: number }>([
+        { $match: sold },
+        { $unwind: "$items" },
+        {
+          $group: {
+            // By name, not id: the line holds a snapshot, so a renamed or deleted
+            // product still reports under what it was actually sold as.
+            _id: "$items.name",
+            quantity: { $sum: "$items.quantity" },
+            revenue: { $sum: { $multiply: ["$items.price", "$items.quantity"] } },
+          },
+        },
+        { $sort: { quantity: -1 } },
+        { $limit: 5 },
+      ]),
+    ]);
+
+    return {
+      // Filled out to every day in the window, so a quiet Tuesday is a gap in the line
+      // rather than a missing point the chart would draw straight through.
+      daily: this.fillDays(since, days, daily),
+      byStatus: byStatus.map(({ _id, count }) => ({ status: _id, count })),
+      topProducts: topProducts.map(({ _id, quantity, revenue }) => ({
+        name: _id,
+        quantity,
+        revenue,
+      })),
+    };
+  }
+
+  private fillDays(
+    since: Date,
+    days: number,
+    rows: { _id: string; orders: number; revenue: number }[]
+  ) {
+    const found = new Map(rows.map((row) => [row._id, row]));
+
+    return Array.from({ length: days }, (_, offset) => {
+      const day = new Date(since);
+      day.setDate(day.getDate() + offset);
+
+      // Local parts, to match the $dateToString above — toISOString would shift the
+      // key by the server's UTC offset and never line up.
+      const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(
+        day.getDate()
+      ).padStart(2, "0")}`;
+
+      return {
+        date: key,
+        orders: found.get(key)?.orders ?? 0,
+        revenue: found.get(key)?.revenue ?? 0,
+      };
+    });
   }
 
   private mergeLines(items: CreateOrderInput["items"]) {
