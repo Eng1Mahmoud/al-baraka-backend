@@ -130,6 +130,10 @@ class ProductService {
 
     this.assertPricing(data.price ?? existing.price, data.discountPrice ?? existing.discountPrice);
 
+    // Caught here as well as in the model hook: switching a product back on without
+    // touching its stock sends no stock field at all, so the hook has nothing to read.
+    if ((data.stock ?? existing.stock) === 0) data.isAvailable = false;
+
     const product = await Product.findByIdAndUpdate(id, data, { new: true, runValidators: true }).populate(
       "category",
       "name slug"

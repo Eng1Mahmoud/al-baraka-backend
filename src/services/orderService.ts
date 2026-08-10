@@ -197,9 +197,17 @@ class OrderService {
     const taken: StockLine[] = [];
 
     for (const item of items) {
+      // A pipeline update rather than $inc: selling the last unit has to take the
+      // product off sale in the same atomic write, or there is a window where the
+      // shop advertises stock it no longer has.
       const result = await Product.updateOne(
         { _id: item.product, isAvailable: true, stock: { $gte: item.quantity } },
-        { $inc: { stock: -item.quantity } }
+        [
+          { $set: { stock: { $subtract: ["$stock", item.quantity] } } },
+          // Reads the stock the stage above just wrote. Untouched when any is left,
+          // so an admin's own "on" stays on.
+          { $set: { isAvailable: { $cond: [{ $lte: ["$stock", 0] }, false, "$isAvailable"] } } },
+        ]
       );
 
       // No match means the product sold out, went unavailable, or was deleted

@@ -33,4 +33,30 @@ const productSchema = new Schema<IProduct>(
 
 productSchema.index({ name: "text", description: "text" }, { default_language: "none" });
 
+/*
+ * Stock is a fact, `isAvailable` is a claim — and a product with nothing on the shelf
+ * cannot be claimed as available whatever the admin last toggled. Enforced on the model
+ * rather than at each call site so no write path can leave a sold-out product on sale.
+ *
+ * Only this direction is automatic. Restocking does not put a product back on sale:
+ * a shop owner may have hidden it deliberately, and this cannot tell the two apart.
+ */
+productSchema.pre("save", function (next) {
+  if (this.stock === 0) this.isAvailable = false;
+  next();
+});
+
+productSchema.pre(["findOneAndUpdate", "updateOne", "updateMany"], function (next) {
+  const update = this.getUpdate();
+
+  // An aggregation-pipeline update computes the new stock from the old one, so it has
+  // to settle availability itself — see orderService.reserveStock.
+  if (!update || Array.isArray(update)) return next();
+
+  const nextStock = update.$set?.stock ?? update.stock;
+  if (nextStock === 0) this.set({ isAvailable: false });
+
+  next();
+});
+
 export default model<IProduct>("Product", productSchema);
